@@ -12,7 +12,7 @@ class TestTTSClone:
         url = f"{BASE_URL}/tts/clone"
         
         # 准备参考音频文件路径
-        audio_prompt_path = "output.wav"
+        audio_prompt_path = "res/liuyandong.mp3"
         
         if not os.path.exists(audio_prompt_path):
             pytest.skip("Reference audio file not found")
@@ -40,7 +40,7 @@ class TestTTSClone:
         """带参考文本的语音克隆"""
         url = f"{BASE_URL}/tts/clone"
         
-        audio_prompt_path = "output.wav"
+        audio_prompt_path = "res/liuyandong.mp3"
         
         if not os.path.exists(audio_prompt_path):
             pytest.skip("Reference audio file not found")
@@ -78,7 +78,7 @@ class TestTTSClone:
         """空文本应该返回错误"""
         url = f"{BASE_URL}/tts/clone"
         
-        audio_prompt_path = "output.wav"
+        audio_prompt_path = "res/liuyandong.mp3"
         
         if not os.path.exists(audio_prompt_path):
             pytest.skip("Reference audio file not found")
@@ -98,7 +98,7 @@ class TestTTSClone:
         """测试语速调整"""
         url = f"{BASE_URL}/tts/clone"
         
-        audio_prompt_path = "output.wav"
+        audio_prompt_path = "res/liuyandong.mp3"
         
         if not os.path.exists(audio_prompt_path):
             pytest.skip("Reference audio file not found")

@@ -24,7 +24,12 @@ def get_device() -> str:
     """获取设备"""
     global _device
     if _device is None:
-        _device = "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            _device = "cuda"
+        elif torch.backends.mps.is_available():
+            _device = "mps"
+        else:
+            _device = "cpu"
     return _device
 
 
@@ -39,7 +44,12 @@ def get_model():
         print(f"Loading Qwen3-TTS Model on {device}...")
         
         # 根据设备选择 dtype
-        dtype = torch.bfloat16 if device == "cuda" else torch.float32
+        if device == "cuda":
+            dtype = torch.bfloat16
+        elif device == "mps":
+            dtype = torch.float32
+        else:
+            dtype = torch.float32
         
         _model = qwen_tts.Qwen3TTSModel.from_pretrained(
             MODEL_NAME,
@@ -122,9 +132,14 @@ def generate_with_reference(
     """
     tts_model = get_model()
     
+    # 当 ref_text 为空时，使用 x_vector_only_mode（仅声纹，无需文本）
+    x_vector_only = not ref_text or not ref_text.strip()
+    
     # 创建克隆提示
     clone_prompt = tts_model.create_voice_clone_prompt(
-        ref_audio=ref_audio_path, ref_text=ref_text
+        ref_audio=ref_audio_path,
+        ref_text=ref_text if not x_vector_only else None,
+        x_vector_only_mode=x_vector_only,
     )
     
     # 生成克隆语音
@@ -230,9 +245,14 @@ def generate_voice_clone(
     """
     tts_model = get_model()
     
+    # 当 ref_text 为空时，使用 x_vector_only_mode（仅声纹，无需文本）
+    x_vector_only = not ref_text or not ref_text.strip()
+    
     # 创建克隆提示
     clone_prompt = tts_model.create_voice_clone_prompt(
-        ref_audio=audio_prompt_path, ref_text=ref_text
+        ref_audio=audio_prompt_path,
+        ref_text=ref_text if not x_vector_only else None,
+        x_vector_only_mode=x_vector_only,
     )
     
     # 生成克隆语音

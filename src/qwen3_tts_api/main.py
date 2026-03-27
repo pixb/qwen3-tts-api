@@ -301,7 +301,7 @@ async def tts_voice_clone(
 
 @app.post("/tts/generate", response_class=FileResponse)
 async def tts_generate_with_reference(
-    text: str = Form(...),
+    text: str = Form(default=""),
     reference_id: Optional[int] = Form(None),
     reference_name: Optional[str] = Form(None),
     language: Optional[str] = Form("Auto"),
