@@ -4,10 +4,32 @@
 
 ## 功能特性
 
-- **文字转语音 (TTS)**: 支持基础的文字转语音功能
 - **语音克隆 (Voice Clone)**: 使用参考音频进行语音克隆
-- **预设说话人 (Custom Voice)**: 使用预设的说话人声音
-- **语音设计 (Voice Design)**: 使用自然语言描述生成语音
+- **参考音频管理**: 上传和管理预设参考音频（含 ref_text）
+- **TTS 生成**: 使用保存的参考音频快速生成语音
+
+## 项目结构
+
+```
+qwen3-tts-api/
+├── src/
+│   └── qwen3_tts_api/           # 源码包
+│       ├── config.py             # 配置
+│       ├── main.py              # FastAPI 应用入口
+│       ├── models/              # 数据模型
+│       ├── services/            # 业务逻辑
+│       ├── db/                  # 数据库层
+│       ├── api/routes/          # API 路由
+│       └── resources/           # 资源管理
+├── tests/                       # 测试
+├── scripts/                     # 脚本
+├── res/                         # 静态资源
+│   └── audio/                   # 示例音频
+├── data/                        # 数据存储
+│   └── *.db                     # SQLite 数据库
+├── api.py                       # 向后兼容入口
+└── pyproject.toml              # 项目配置
+```
 
 ## 支持语言
 
@@ -25,8 +47,7 @@
 ## 安装
 
 ```bash
-cd /home/pix/dev/code/ai/qwen3-tts
-pip install -r requirements.txt
+uv sync
 ```
 
 ## 启动服务
@@ -35,8 +56,14 @@ pip install -r requirements.txt
 # 方式1: 使用启动脚本
 ./start.sh
 
-# 方式2: 直接运行
+# 方式2: 向后兼容入口
 python -m uvicorn api:app --host 0.0.0.0 --port 8001 --reload
+
+# 方式3: 直接运行（推荐）
+python -m uvicorn src.qwen3_tts_api.main:app --host 0.0.0.0 --port 8001 --reload
+
+# 方式4: 编程式启动
+python -m qwen3_tts_api
 ```
 
 ## API 端点
@@ -47,62 +74,11 @@ python -m uvicorn api:app --host 0.0.0.0 --port 8001 --reload
 GET /health
 ```
 
-返回:
-```json
-{
-  "status": "healthy",
-  "device": "cuda",
-  "model": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
-  "supported_languages": [...]
-}
-```
-
 ### 获取支持的语言列表
 
 ```bash
 GET /languages
 ```
-
-### 文字转语音 (Voice Clone 方式)
-
-```bash
-POST /tts
-```
-
-参数:
-- `text` (必填): 要转换的文本
-- `language` (可选): 语言，默认自动检测
-- `exaggeration` (可选): 情感夸张程度 0.0-1.0，默认 0.5
-- `temperature` (可选): 采样温度 0.0-1.0，默认 0.8
-- `instruct` (可选): 语音风格指令，用于控制语速、情感、语气等，用于控制语速、情感、语气等
-- `audio_prompt` (可选): 参考音频文件
-
-### 预设说话人 TTS
-
-```bash
-POST /tts/custom
-```
-
-参数:
-- `text` (必填): 要转换的文本
-- `language` (可选): 语言，默认自动检测
-- `speaker` (必填): 预设说话人名称
-- `exaggeration` (可选): 情感夸张程度 0.0-1.0
-- `temperature` (可选): 采样温度 0.0-1.0
-- `instruct` (可选): 语音风格指令，用于控制语速、情感、语气等
-
-### 语音设计
-
-```bash
-POST /tts/design
-```
-
-参数:
-- `text` (必填): 要转换的文本
-- `language` (可选): 语言，默认自动检测
-- `instruct` (必填): 自然语言声音描述
-- `exaggeration` (可选): 情感夸张程度 0.0-1.0
-- `temperature` (可选): 采样温度 0.0-1.0
 
 ### 语音克隆
 
@@ -111,17 +87,69 @@ POST /tts/clone
 ```
 
 参数:
+
 - `text` (必填): 要转换的文本
 - `audio_prompt` (必填): 参考音频文件
 - `language` (可选): 语言，默认自动检测
 - `ref_text` (可选): 参考音频对应的文本
+- `exaggeration` (可选): 情感夸张程度 0.0-1.0，默认 0.5
+- `temperature` (可选): 采样温度 0.0-1.0，默认 0.8
+- `instruct` (可选): 语音风格指令
+- `speed_rate` (可选): 语速倍率 0.5-2.0，默认 1.0
+
+### 参考音频管理
+
+```bash
+# 上传参考音频
+POST /tts/reference/upload
+# 参数: name, file, ref_text, language, exaggeration, temperature, instruct, speed_rate
+
+# 列出所有参考音频
+GET /tts/reference/list
+
+# 获取默认参考音频
+GET /tts/reference/default
+
+# 设置默认参考音频
+POST /tts/reference/default/{id}
+
+# 获取单个参考音频详情
+GET /tts/reference/{id}
+
+# 下载参考音频
+GET /tts/reference/{id}/audio
+
+# 更新参考音频信息
+POST /tts/reference/{id}
+# 参数: name, ref_text, language, exaggeration, temperature, instruct, speed_rate
+
+# 删除参考音频
+DELETE /tts/reference/{id}
+```
+
+### TTS 生成 (使用保存的参考音频)
+
+```bash
+POST /tts/generate
+```
+
+参数:
+
+- `text` (必填): 要转换的文本
+- `reference_id` (可选): 参考音频 ID
+- `reference_name` (可选): 参考音频名称
+- `language` (可选): 语言，默认自动检测
 - `exaggeration` (可选): 情感夸张程度 0.0-1.0
 - `temperature` (可选): 采样温度 0.0-1.0
-- `instruct` (可选): 语音风格指令，用于控制语速、情感、语气等
+- `instruct` (可选): 语音风格指令
+- `speed_rate` (可选): 语速倍率 0.5-2.0
+
+注意: `reference_id` 和 `reference_name` 二选一，参数可覆盖默认值
 
 ## 风格提示词示例
 
 ### 语速节奏
+
 - "Speak at a relaxed, conversational pace"
 - "Speak with natural rhythm, not too fast"
 - "Slow down for important points"
@@ -129,6 +157,7 @@ POST /tts/clone
 - "语速适中，自然流畅"
 
 ### 情感表达
+
 - "Speak with warmth and friendliness"
 - "Sound enthusiastic and energetic"
 - "Speak in a calm, professional manner"
@@ -136,6 +165,7 @@ POST /tts/clone
 - "温柔亲切，富有情感"
 
 ### 语气语调
+
 - "Use a gentle, soothing tone"
 - "Speak with a cheerful inflection"
 - "Add some emphasis on key words"
@@ -143,6 +173,7 @@ POST /tts/clone
 - "像朋友聊天一样自然"
 
 ### 具体场景
+
 - "Tell this story with emotion and expression"
 - "Read this like a friendly podcast host"
 - "Explain this clearly and patiently"
@@ -150,11 +181,14 @@ POST /tts/clone
 - "专业播音员的感觉"
 
 ### 停顿控制
+
 - 使用标点符号（逗号、句号、问号、感叹号）自动添加停顿
 - 使用 `...` 添加额外停顿，可叠加使用（如 `.....`）增加停顿时长
 
 ### 参数配合
+
 建议结合 `exaggeration` 参数（0.0-1.0）一起使用：
+
 - 值越高情感越夸张
 - 较低的值（0.2-0.4）更适合专业场景
 - 较高的值（0.6-0.8）适合富有表现力的内容
@@ -164,24 +198,30 @@ POST /tts/clone
 ### cURL 示例
 
 ```bash
-# 基础 TTS
-curl -X POST "http://localhost:8001/tts" \
-  -F "text=Hello, this is a test." \
-  -F "language=English" \
+# 1. 上传参考音频（含ref_text和默认参数）
+curl -X POST "http://localhost:8001/tts/reference/upload" \
+  -F "name=我的音色" \
+  -F "file=@audio.wav" \
+  -F "ref_text=这是参考文本" \
+  -F "language=Chinese" \
+  -F "exaggeration=0.5" \
+  -F "temperature=0.8"
+
+# 2. 列出所有参考音频
+curl http://localhost:8001/tts/reference/list
+
+# 3. 使用保存的参考音频生成语音
+curl -X POST "http://localhost:8001/tts/generate" \
+  -F "text=你好，世界" \
+  -F "reference_id=1" \
   --output output.wav
 
-# 语音克隆
-curl -X POST "http://localhost:8001/tts/clone" \
-  -F "text=Hello, this is a test." \
-  -F "audio_prompt=@reference.wav" \
-  -F "ref_text=The text spoken in the reference audio" \
-  --output clone_output.wav
-
-# 语音设计
-curl -X POST "http://localhost:8001/tts/design" \
-  -F "text=Hello, this is a test." \
-  -F "instruct=A warm and friendly male voice" \
-  --output design_output.wav
+# 4. 使用名称查找并生成（可覆盖默认参数）
+curl -X POST "http://localhost:8001/tts/generate" \
+  -F "text=Hello world" \
+  -F "reference_name=我的音色" \
+  -F "exaggeration=0.7" \
+  --output output2.wav
 ```
 
 ### Python 示例
@@ -189,13 +229,13 @@ curl -X POST "http://localhost:8001/tts/design" \
 ```python
 import requests
 
-# 基础 TTS
-with open("text.txt") as f:
-    text = f.read()
-
+# 使用保存的参考音频生成
 response = requests.post(
-    "http://localhost:8001/tts",
-    data={"text": text, "language": "English"},
+    "http://localhost:8001/tts/generate",
+    data={
+        "text": "你好，世界",
+        "reference_id": 1,
+    },
 )
 
 with open("output.wav", "wb") as f:
@@ -209,3 +249,5 @@ with open("output.wav", "wb") as f:
 - **懒加载**: 模型在首次请求时加载
 - **临时文件清理**: 自动后台清理上传和输出文件
 - **语言检测**: 支持自动检测 10 种语言
+- **数据存储**: SQLite 数据库管理参考音频
+- **代码结构**: 符合 Python 最佳实践，分层设计
