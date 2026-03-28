@@ -50,8 +50,8 @@ class TestTTSClone:
                 url,
                 data={
                     "text": "Hello world",
-                    "language": "English",
-                    "ref_text": "This is the reference text",
+                    "language": "Chinese",
+                    "ref_text": "当时我就觉得这太搞笑了，就这一个动作我反反的复复玩了一下午，每次玩的时候都会笑，在说任天堂故事的时候，我会提起当任天堂发展的时候",
                     "exaggeration": 0.6,
                     "temperature": 0.7,
                 },
@@ -92,7 +92,7 @@ class TestTTSClone:
                 files={"audio_prompt": f},
             )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_clone_with_speed_rate(self):
         """测试语速调整"""

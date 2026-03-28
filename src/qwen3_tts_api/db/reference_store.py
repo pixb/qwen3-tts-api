@@ -118,7 +118,7 @@ class TTSReferenceStore:
             row = cursor.fetchone()
         
         if row:
-            return dict(row)
+            return self._convert_row(row)
         return None
     
     def get_by_name(self, name: str) -> Optional[Dict[str, Any]]:
@@ -132,9 +132,16 @@ class TTSReferenceStore:
             row = cursor.fetchone()
         
         if row:
-            return dict(row)
+            return self._convert_row(row)
         return None
     
+    def _convert_row(self, row: sqlite3.Row) -> Dict[str, Any]:
+        """转换数据库行为标准字典，类型转换"""
+        result = dict(row)
+        if "is_default" in result:
+            result["is_default"] = bool(result["is_default"])
+        return result
+
     def get_all(self) -> List[Dict[str, Any]]:
         """获取所有参考音频"""
         with get_reference_db_connection() as conn:
@@ -144,7 +151,7 @@ class TTSReferenceStore:
             )
             rows = cursor.fetchall()
         
-        return [dict(row) for row in rows]
+        return [self._convert_row(row) for row in rows]
     
     def get_default(self) -> Optional[Dict[str, Any]]:
         """获取默认参考音频"""
@@ -154,9 +161,9 @@ class TTSReferenceStore:
                 "SELECT * FROM tts_references WHERE is_default = 1 LIMIT 1"
             )
             row = cursor.fetchone()
-        
+
         if row:
-            return dict(row)
+            return self._convert_row(row)
         return None
     
     def update(
