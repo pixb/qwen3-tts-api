@@ -167,56 +167,6 @@ def generate_with_reference(
     return wav, sr
 
 
-def generate_custom_voice(
-    text: str,
-    speaker: str,
-    language: str = DEFAULT_LANGUAGE,
-    exaggeration: float = DEFAULT_EXAGGERATION,
-    temperature: float = DEFAULT_TEMPERATURE,
-    instruct: Optional[str] = None,
-    speed_rate: float = 1.0,
-) -> Tuple[np.ndarray, int]:
-    """
-    使用预设说话人生成语音
-    
-    Args:
-        text: 要转换的文本
-        speaker: 预设说话人
-        language: 语言
-        exaggeration: 情感夸张程度
-        temperature: 采样温度
-        instruct: 语音风格指令
-        speed_rate: 语速
-        
-    Returns:
-        Tuple[audio_data, sample_rate]
-    """
-    tts_model = get_model()
-    
-    wavs, sr = tts_model.generate_custom_voice(
-        text=text,
-        language=language,
-        speaker=speaker,
-        instruct=instruct,
-        temperature=temperature,
-    )
-    
-    # 处理音频数据
-    if isinstance(wavs, (list, tuple)) and len(wavs) > 0:
-        wav = wavs[0]
-    else:
-        wav = wavs
-    
-    if isinstance(wav, torch.Tensor):
-        wav = wav.cpu().numpy()
-    
-    # 调整语速
-    if speed_rate != 1.0:
-        wav, sr = adjust_audio_speed(wav, sr, speed_rate)
-    
-    return wav, sr
-
-
 def generate_voice_clone(
     text: str,
     audio_prompt_path: str,

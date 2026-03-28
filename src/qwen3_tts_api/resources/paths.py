@@ -51,25 +51,11 @@ def get_references_dir() -> Path:
     return refs_dir
 
 
-@lru_cache()
-def get_custom_audio_dir() -> Path:
-    """获取自定义音频目录"""
-    custom_dir = get_resources_dir() / "custom_audio"
-    custom_dir.mkdir(exist_ok=True)
-    return custom_dir
-
-
 # ==================== Database Paths ====================
 @lru_cache()
 def get_reference_db_path() -> Path:
     """获取参考音频数据库路径"""
     return get_data_dir() / "tts_references.db"
-
-
-@lru_cache()
-def get_custom_voice_db_path() -> Path:
-    """获取自定义音色数据库路径"""
-    return get_data_dir() / "tts_custom.db"
 
 
 @lru_cache()

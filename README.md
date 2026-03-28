@@ -66,6 +66,10 @@ python -m uvicorn src.qwen3_tts_api.main:app --host 0.0.0.0 --port 8001 --reload
 python -m qwen3_tts_api
 ```
 
+## API 文档
+
+详细 API 文档请参考 [docs/REFERENCE_AUDIO_API.md](docs/REFERENCE_AUDIO_API.md)
+
 ## API 端点
 
 ### 健康检查
