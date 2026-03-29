@@ -21,9 +21,9 @@ class TestReference:
             cls.reference_id = data["data"][0]["id"]
             return
 
-        audio_path = "res/audio/liuyandong.mp3"
+        audio_path = "res/liuyandong.mp3"
         if not os.path.exists(audio_path):
-            audio_path = "res/audio/tianyuan.mp3"
+            audio_path = "res/liuyandong.mp3"
 
         if not os.path.exists(audio_path):
             pytest.skip("Sample audio file not found")
@@ -32,7 +32,7 @@ class TestReference:
         with open(audio_path, "rb") as f:
             response = requests.post(
                 upload_url,
-                data={"name": "测试参考音频-setup"},
+                data={"name": "测试参考音频-setup", "ref_text": "这是参考文本"},
                 files={"file": f},
             )
 
@@ -43,9 +43,9 @@ class TestReference:
         """上传参考音频"""
         url = f"{BASE_URL}/tts/reference/upload"
         
-        audio_path = "res/audio/liuyandong.mp3"
+        audio_path = "res/liuyandong.mp3"
         if not os.path.exists(audio_path):
-            audio_path = "res/audio/tianyuan.mp3"
+            audio_path = "res/liuyandong.mp3"
         
         if not os.path.exists(audio_path):
             pytest.skip("Sample audio file not found")
@@ -74,14 +74,14 @@ class TestReference:
         """最简上传（仅必需参数）"""
         url = f"{BASE_URL}/tts/reference/upload"
         
-        audio_path = "res/audio/tianyuan.mp3"
+        audio_path = "res/liuyandong.mp3"
         if not os.path.exists(audio_path):
             pytest.skip("Sample audio file not found")
 
         with open(audio_path, "rb") as f:
             response = requests.post(
                 url,
-                data={"name": "最简上传测试"},
+                data={"name": "最简上传测试", "ref_text": "这是参考文本"},
                 files={"file": f},
             )
 
@@ -92,7 +92,7 @@ class TestReference:
         """上传并设为默认"""
         url = f"{BASE_URL}/tts/reference/upload"
         
-        audio_path = "res/audio/liuyandong.mp3"
+        audio_path = "res/liuyandong.mp3"
         if not os.path.exists(audio_path):
             pytest.skip("Sample audio file not found")
 
@@ -101,6 +101,7 @@ class TestReference:
                 url,
                 data={
                     "name": "默认测试参考音频",
+                    "ref_text": "这是参考文本",
                     "is_default": 1,
                 },
                 files={"file": f},
@@ -213,7 +214,7 @@ class TestReference:
         url = f"{BASE_URL}/tts/reference/{reference_id}"
         response = requests.post(
             url,
-            data={"name": "新名称"},
+            data={"name": "新名称", "ref_text": "这是参考文本"},
         )
         
         assert response.status_code == 200
@@ -236,6 +237,7 @@ class TestReference:
         response = requests.post(
             url,
             data={
+                "ref_text": "这是参考文本",
                 "exaggeration": 0.7,
                 "temperature": 0.9,
                 "speed_rate": 1.2,
@@ -248,7 +250,7 @@ class TestReference:
     def test_delete_reference(self):
         """删除参考音频"""
         url = f"{BASE_URL}/tts/reference/upload"
-        audio_path = "res/audio/liuyandong.mp3"
+        audio_path = "res/liuyandong.mp3"
         
         if not os.path.exists(audio_path):
             pytest.skip("Sample audio file not found")
@@ -256,7 +258,7 @@ class TestReference:
         with open(audio_path, "rb") as f:
             response = requests.post(
                 url,
-                data={"name": "待删除"},
+                data={"name": "待删除", "ref_text": "这是参考文本"},
                 files={"file": f},
             )
         

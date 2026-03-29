@@ -23,6 +23,7 @@ class TestTTSClone:
                 data={
                     "text": "你好，这是一段测试语音",
                     "language": "auto",
+                    "ref_text": "这是参考文本",
                     "exaggeration": 0.5,
                     "temperature": 0.8,
                 },
@@ -69,6 +70,7 @@ class TestTTSClone:
             url,
             data={
                 "text": "测试文字",
+                "ref_text": "这是参考文本",
             },
         )
 
@@ -88,6 +90,7 @@ class TestTTSClone:
                 url,
                 data={
                     "text": "",
+                    "ref_text": "这是参考文本",
                 },
                 files={"audio_prompt": f},
             )
@@ -108,6 +111,7 @@ class TestTTSClone:
                 url,
                 data={
                     "text": "测试语速调整",
+                    "ref_text": "这是参考文本",
                     "speed_rate": 1.5,
                 },
                 files={"audio_prompt": f},

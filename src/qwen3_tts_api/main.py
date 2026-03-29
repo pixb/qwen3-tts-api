@@ -2,8 +2,12 @@
 Qwen3-TTS FastAPI Server Main Entry
 """
 import uuid
+import asyncio
+import psutil
+import concurrent.futures
 from pathlib import Path
 from typing import Optional
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,11 +24,42 @@ from .resources.paths import get_upload_dir, get_output_dir, get_references_dir
 from .api.routes.reference import router as reference_router
 
 
-# ==================== FastAPI 初始化 ====================
+MEMORY_THRESHOLD_MB = 500
+_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+
+
+def check_memory_available():
+    """检查可用内存，不足时抛出异常"""
+    mem = psutil.virtual_memory()
+    available_mb = mem.available / (1024 * 1024)
+    if available_mb < MEMORY_THRESHOLD_MB:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Insufficient memory (available: {available_mb:.0f}MB, required: {MEMORY_THRESHOLD_MB}MB). Please try again later."
+        )
+    return available_mb
+
+
+async def idle_model_cleanup():
+    """后台任务：定期检查并卸载空闲模型"""
+    while True:
+        await asyncio.sleep(300)
+        tts_service.unload_model_if_idle()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    asyncio.create_task(idle_model_cleanup())
+    yield
+    _executor.shutdown(wait=False)
+
+
 app = FastAPI(
     title="Qwen3-TTS API",
     version="1.0.0",
     description="Qwen3 Text-to-Speech API with voice cloning and voice design support",
+    lifespan=lifespan,
 )
 app.add_middleware(
     CORSMiddleware,
@@ -34,24 +69,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 注册路由
 app.include_router(reference_router)
 
-# ==================== 目录初始化 ====================
 UPLOAD_DIR = get_upload_dir()
 OUTPUT_DIR = get_output_dir()
 
 
-# ==================== 健康检查 ====================
 @app.get("/health")
 async def health_check():
     """健康检查端点"""
     device = tts_service.get_device()
+    model_status = tts_service.get_model_status()
+    mem = psutil.virtual_memory()
+    
     return {
         "status": "healthy",
         "device": device,
         "model": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
         "supported_languages": SUPPORTED_LANGUAGES,
+        "model_status": model_status,
+        "memory": {
+            "total_mb": int(mem.total / (1024 * 1024)),
+            "available_mb": int(mem.available / (1024 * 1024)),
+            "used_percent": mem.percent,
+        },
+        "concurrency": {
+            "max_tts": MAX_CONCURRENT_TTS,
+            "max_long_tts": MAX_CONCURRENT_LONG_TTS,
+        },
     }
 
 
@@ -60,8 +105,6 @@ async def get_languages():
     """获取支持的语言列表"""
     return {"languages": SUPPORTED_LANGUAGES, "default": DEFAULT_LANGUAGE}
 
-
-# ==================== TTS 端点 ====================
 
 @app.post("/tts/design", response_class=FileResponse)
 async def tts_voice_design(
@@ -90,7 +133,8 @@ async def tts_voice_design(
             status_code=400, detail="Voice description (instruct) cannot be empty"
         )
     
-    # 检测语言
+    check_memory_available()
+    
     detected_lang = (
         normalize_language(language)
         if language and language.lower() != "auto"
@@ -101,21 +145,22 @@ async def tts_voice_design(
     print(f"📝 Text: {text[:50]}... | Lang: {lang} | Instruct: {instruct[:30]}...")
     
     try:
-        # 使用 voice design 生成
-        wav, sr = tts_service.generate_voice_design(
-            text=text,
-            instruct=instruct,
-            language=lang,
-            exaggeration=exaggeration,
-            temperature=temperature,
-            speed_rate=speed_rate,
+        loop = asyncio.get_running_loop()
+        wav, sr = await loop.run_in_executor(
+            _executor,
+            lambda: tts_service.generate_voice_design(
+                text=text,
+                instruct=instruct,
+                language=lang,
+                exaggeration=exaggeration,
+                temperature=temperature,
+                speed_rate=speed_rate,
+            )
         )
         
-        # 保存输出
         output_path = OUTPUT_DIR / f"{uuid.uuid4()}.wav"
         tts_service.save_audio([wav], sr, output_path)
         
-        # 设置后台清理
         bg_tasks = BackgroundTasks()
         bg_tasks.add_task(cleanup_file, output_path)
         
@@ -138,7 +183,7 @@ async def tts_voice_clone(
     text: str = Form(...),
     audio_prompt: UploadFile = File(...),
     language: Optional[str] = Form("Auto"),
-    ref_text: Optional[str] = Form(None),
+    ref_text: str = Form(...),
     exaggeration: float = Form(DEFAULT_EXAGGERATION),
     temperature: float = Form(DEFAULT_TEMPERATURE),
     instruct: Optional[str] = Form(None),
@@ -150,7 +195,7 @@ async def tts_voice_clone(
     - **text**: 要转换的文本 (必填)
     - **audio_prompt**: 参考音频 (必填)
     - **language**: 语言 (默认自动检测)
-    - **ref_text**: 参考音频对应的文本 (可选)
+    - **ref_text**: 参考音频对应的文本 (必填，描述参考音频的内容)
     - **exaggeration**: 情感夸张程度 0.0-1.0 (默认 0.5)
     - **temperature**: 采样温度 0.0-1.0 (默认 0.8)
     - **instruct**: 语音风格指令 (可选)
@@ -159,7 +204,11 @@ async def tts_voice_clone(
     if not text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
     
-    # 检测语言
+    if not ref_text.strip():
+        raise HTTPException(status_code=400, detail="ref_text cannot be empty")
+    
+    check_memory_available()
+    
     detected_lang = (
         normalize_language(language)
         if language and language.lower() != "auto"
@@ -173,28 +222,28 @@ async def tts_voice_clone(
     temp_files = []
     
     try:
-        # 保存参考音频
         audio_prompt_path = UPLOAD_DIR / f"{uuid.uuid4()}.wav"
         tts_service.save_upload_file(audio_prompt, audio_prompt_path)
         temp_files.append(audio_prompt_path)
         
-        # 生成克隆语音
-        wav, sr = tts_service.generate_voice_clone(
-            text=text,
-            audio_prompt_path=str(audio_prompt_path),
-            language=lang,
-            ref_text=ref_text,
-            exaggeration=exaggeration,
-            temperature=temperature,
-            instruct=instruct,
-            speed_rate=speed_rate,
+        loop = asyncio.get_running_loop()
+        wav, sr = await loop.run_in_executor(
+            _executor,
+            lambda: tts_service.generate_voice_clone(
+                text=text,
+                audio_prompt_path=str(audio_prompt_path),
+                language=lang,
+                ref_text=ref_text,
+                exaggeration=exaggeration,
+                temperature=temperature,
+                instruct=instruct,
+                speed_rate=speed_rate,
+            )
         )
         
-        # 保存输出
         output_path = OUTPUT_DIR / f"{uuid.uuid4()}.wav"
         tts_service.save_audio([wav], sr, output_path)
         
-        # 设置后台清理
         bg_tasks = BackgroundTasks()
         bg_tasks.add_task(cleanup_file, output_path)
         for f in temp_files:
@@ -223,7 +272,7 @@ async def tts_generate_with_reference(
     reference_id: Optional[int] = Form(None),
     reference_name: Optional[str] = Form(None),
     language: Optional[str] = Form("Auto"),
-    ref_text: Optional[str] = Form(None),
+    ref_text: str = Form(...),
     exaggeration: Optional[float] = Form(None),
     temperature: Optional[float] = Form(None),
     instruct: Optional[str] = Form(None),
@@ -236,7 +285,7 @@ async def tts_generate_with_reference(
     - **reference_id**: 参考音频 ID (必填，至少提供 reference_id 或 reference_name 之一)
     - **reference_name**: 参考音频名称 (必填，至少提供 reference_id 或 reference_name 之一)
     - **language**: 语言 (默认自动检测)
-    - **ref_text**: 参考文本，会覆盖保存的默认值 (可选)
+    - **ref_text**: 参考文本 (必填，描述参考音频的内容)
     - **exaggeration**: 情感夸张程度 0.0-1.0，会覆盖保存的默认值 (可选)
     - **temperature**: 采样温度 0.0-1.0，会覆盖保存的默认值 (可选)
     - **instruct**: 语音风格指令，会覆盖保存的默认值 (可选)
@@ -245,17 +294,19 @@ async def tts_generate_with_reference(
     if not text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
     
-    # 检查参数
+    if not ref_text.strip():
+        raise HTTPException(status_code=400, detail="ref_text cannot be empty")
+    
     if not reference_id and not reference_name:
         raise HTTPException(
             status_code=400,
             detail="必须提供 reference_id 或 reference_name 之一",
         )
     
-    # 导入参考音频存储
+    check_memory_available()
+    
     from .db.reference_store import store as reference_store
     
-    # 检测语言
     detected_lang = (
         normalize_language(language)
         if language and language.lower() != "auto"
@@ -263,10 +314,7 @@ async def tts_generate_with_reference(
     )
     lang = detected_lang if detected_lang else DEFAULT_LANGUAGE
     
-    temp_files = []
-    
     try:
-        # 获取参考音频
         reference = None
         if reference_id:
             reference = reference_store.get_by_id(reference_id)
@@ -279,7 +327,6 @@ async def tts_generate_with_reference(
                 detail=f"未找到参考音频 (id: {reference_id}, name: {reference_name})",
             )
         
-        # 获取参考音频路径（支持相对路径和绝对路径，向后兼容）
         stored_path = reference["file_path"]
         if Path(stored_path).is_absolute():
             ref_audio_path = Path(stored_path)
@@ -289,10 +336,6 @@ async def tts_generate_with_reference(
         if not ref_audio_path.exists():
             raise HTTPException(status_code=404, detail="参考音频文件不存在")
         
-        temp_files.append(ref_audio_path)
-        
-        # 使用覆盖参数或默认值
-        use_ref_text = ref_text if ref_text is not None else reference.get("ref_text")
         use_exaggeration = exaggeration if exaggeration is not None else reference.get("exaggeration", DEFAULT_EXAGGERATION)
         use_temperature = temperature if temperature is not None else reference.get("temperature", DEFAULT_TEMPERATURE)
         use_instruct = instruct if instruct is not None else reference.get("instruct")
@@ -301,23 +344,24 @@ async def tts_generate_with_reference(
         print(f"📝 Text: {text[:50]}... | Lang: {lang} | Reference: {reference['name']}")
         print(f"   Params: exaggeration={use_exaggeration}, temperature={use_temperature}, instruct={use_instruct}, speed_rate={use_speed_rate}")
         
-        # 生成克隆语音
-        wav, sr = tts_service.generate_with_reference(
-            text=text,
-            ref_audio_path=str(ref_audio_path),
-            language=lang,
-            ref_text=use_ref_text,
-            exaggeration=use_exaggeration,
-            temperature=use_temperature,
-            instruct=use_instruct,
-            speed_rate=use_speed_rate,
+        loop = asyncio.get_running_loop()
+        wav, sr = await loop.run_in_executor(
+            _executor,
+            lambda: tts_service.generate_with_reference(
+                text=text,
+                ref_audio_path=str(ref_audio_path),
+                language=lang,
+                ref_text=ref_text,
+                exaggeration=use_exaggeration,
+                temperature=use_temperature,
+                instruct=use_instruct,
+                speed_rate=use_speed_rate,
+            )
         )
         
-        # 保存输出
         output_path = OUTPUT_DIR / f"{uuid.uuid4()}.wav"
         tts_service.save_audio([wav], sr, output_path)
         
-        # 设置后台清理
         bg_tasks = BackgroundTasks()
         bg_tasks.add_task(cleanup_file, output_path)
         
@@ -335,3 +379,6 @@ async def tts_generate_with_reference(
         err_trace = traceback.format_exc()
         print(f"❌ Error: {err_trace}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 class ReferenceAudioCreate(BaseModel):
     """创建参考音频请求"""
     name: str = Field(..., description="音频名称")
-    ref_text: Optional[str] = Field(None, description="参考文本")
+    ref_text: str = Field(..., description="参考文本（描述音频内容）")
     language: Optional[str] = Field(None, description="语言")
     exaggeration: float = Field(0.5, ge=0.0, le=1.0, description="情感夸张程度")
     temperature: float = Field(0.8, ge=0.0, le=1.0, description="采样温度")
@@ -34,7 +34,7 @@ class ReferenceAudioResponse(BaseModel):
     id: int
     name: str
     file_path: str
-    ref_text: Optional[str]
+    ref_text: str
     language: Optional[str]
     exaggeration: float
     temperature: float

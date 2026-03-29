@@ -42,7 +42,7 @@
 |------|------|------|--------|------|
 | name | string | 是 | - | 音频名称 |
 | file | file | 是 | - | 音频文件 (mp3/wav/m4a/flac/ogg/aac) |
-| ref_text | string | 否 | None | 参考文本（描述音频内容） |
+| ref_text | string | 是 | - | 参考文本（描述音频内容） |
 | language | string | 否 | None | 语言 |
 | exaggeration | float | 否 | 0.5 | 情感夸张值 (0.0-1.0) |
 | temperature | float | 否 | 0.8 | 采样温度 (0.0-1.0) |
@@ -282,7 +282,7 @@
 | reference_id | int | 是* | - | 参考音频 ID (二选一) |
 | reference_name | string | 是* | - | 参考音频名称 (二选一) |
 | language | string | 否 | Auto | 语言 (默认自动检测) |
-| ref_text | string | 否 | 参考音频默认值 | 参考文本 (覆盖默认值) |
+| ref_text | string | 是 | - | 参考文本 (描述参考音频的内容) |
 | exaggeration | float | 否 | 参考音频默认值 | 情感夸张值 (覆盖默认值) |
 | temperature | float | 否 | 参考音频默认值 | 采样温度 (覆盖默认值) |
 | instruct | string | 否 | 参考音频默认值 | 语音风格指令 (覆盖默认值) |
@@ -312,7 +312,7 @@
 | id | INTEGER | 主键，自增 |
 | name | TEXT | 音频名称，唯一 |
 | file_path | TEXT | 文件路径（相对路径） |
-| ref_text | TEXT | 参考文本 (可选) |
+| ref_text | TEXT | 参考文本 (必填) |
 | language | TEXT | 语言 (可选) |
 | exaggeration | REAL | 默认情感夸张值 |
 | temperature | REAL | 默认采样温度 |
@@ -329,7 +329,7 @@
 ### cURL 示例
 
 ```bash
-# 1. 上传参考音频
+# 1. 上传参考音频（ref_text 必填）
 curl -X POST "http://localhost:8001/tts/reference/upload" \
   -F "name=我的音色" \
   -F "file=@audio.wav" \
@@ -361,16 +361,18 @@ curl -X POST "http://localhost:8001/tts/reference/1" \
 # 8. 删除参考音频
 curl -X DELETE "http://localhost:8001/tts/reference/1"
 
-# 9. 使用参考音频生成语音 (通过ID)
+# 9. 使用参考音频生成语音 (通过ID，ref_text 必填)
 curl -X POST "http://localhost:8001/tts/generate" \
   -F "text=你好，世界" \
   -F "reference_id=1" \
+  -F "ref_text=这是参考音频的文本内容" \
   --output output.wav
 
-# 10. 使用参考音频生成语音 (通过名称，可覆盖参数)
+# 10. 使用参考音频生成语音 (通过名称，ref_text 必填)
 curl -X POST "http://localhost:8001/tts/generate" \
   -F "text=Hello world" \
   -F "reference_name=我的音色" \
+  -F "ref_text=这是参考音频的文本内容" \
   -F "exaggeration=0.7" \
   --output output2.wav
 ```
@@ -380,7 +382,7 @@ curl -X POST "http://localhost:8001/tts/generate" \
 ```python
 import requests
 
-# 上传参考音频
+# 上传参考音频（ref_text 必填）
 with open("audio.wav", "rb") as f:
     response = requests.post(
         "http://localhost:8001/tts/reference/upload",
@@ -395,12 +397,13 @@ with open("audio.wav", "rb") as f:
     )
     print(response.json())
 
-# 使用保存的参考音频生成
+# 使用保存的参考音频生成（ref_text 必填）
 response = requests.post(
     "http://localhost:8001/tts/generate",
     data={
         "text": "你好，世界",
         "reference_id": 1,
+        "ref_text": "这是参考音频的文本内容",
     },
 )
 

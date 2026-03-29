@@ -24,6 +24,7 @@ class TestTTSGenerate:
             data={
                 "text": "你好，这是一段测试",
                 "reference_id": reference_id,
+                "ref_text": "这是参考文本",
             },
         )
 
@@ -48,6 +49,7 @@ class TestTTSGenerate:
             data={
                 "text": "Hello world",
                 "reference_name": reference_name,
+                "ref_text": "这是参考文本",
             },
         )
 
@@ -71,6 +73,7 @@ class TestTTSGenerate:
             data={
                 "text": "测试自定义参数",
                 "reference_id": reference_id,
+                "ref_text": "这是参考文本",
                 "exaggeration": 0.7,
                 "temperature": 0.9,
                 "speed_rate": 1.2,
@@ -86,6 +89,7 @@ class TestTTSGenerate:
             url,
             data={
                 "text": "测试文字",
+                "ref_text": "这是参考文本",
             },
         )
 
@@ -98,6 +102,7 @@ class TestTTSGenerate:
             url,
             data={
                 "text": "测试文字",
+                "ref_text": "这是参考文本",
                 "reference_id": 99999,
             },
         )
@@ -111,6 +116,7 @@ class TestTTSGenerate:
             url,
             data={
                 "text": "测试文字",
+                "ref_text": "这是参考文本",
                 "reference_name": "不存在的名称",
             },
         )
@@ -135,6 +141,7 @@ class TestTTSGenerate:
             data={
                 "text": "Hello world, this is a test",
                 "reference_id": reference_id,
+                "ref_text": "这是参考文本",
                 "language": "English",
             },
         )
@@ -159,6 +166,7 @@ class TestTTSGenerate:
             data={
                 "text": "",
                 "reference_id": reference_id,
+                "ref_text": "这是参考文本",
             },
         )
 

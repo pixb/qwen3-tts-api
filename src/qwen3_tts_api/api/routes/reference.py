@@ -30,7 +30,7 @@ def validate_audio_file(filename: str) -> bool:
 async def upload_reference_audio(
     name: str = Form(...),
     file: UploadFile = File(...),
-    ref_text: Optional[str] = Form(None),
+    ref_text: str = Form(...),
     language: Optional[str] = Form(None),
     exaggeration: Optional[float] = Form(0.5),
     temperature: Optional[float] = Form(0.8),
@@ -43,7 +43,7 @@ async def upload_reference_audio(
     
     - **name**: 音频名称 (必填)
     - **file**: 音频文件 (必填，支持 mp3/wav/m4a/flac/ogg/aac)
-    - **ref_text**: 参考文本（可选，描述音频内容）
+    - **ref_text**: 参考文本（必填，描述音频内容）
     - **language**: 语言 (可选)
     - **exaggeration**: 默认情感夸张值 0.0-1.0 (默认 0.5)
     - **temperature**: 默认采样温度 0.0-1.0 (默认 0.8)
@@ -51,6 +51,13 @@ async def upload_reference_audio(
     - **speed_rate**: 默认语速 0.5-2.0 (默认 1.0)
     - **is_default**: 是否设为默认参考音频 (默认 False)
     """
+    # 验证 ref_text 不为空
+    if not ref_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="ref_text 不能为空",
+        )
+    
     # 验证文件类型
     if not validate_audio_file(file.filename):
         raise HTTPException(
