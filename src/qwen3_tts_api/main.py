@@ -22,6 +22,8 @@ from .services.utils import detect_language, normalize_language, cleanup_file
 from .services import tts as tts_service
 from .resources.paths import get_upload_dir, get_output_dir, get_references_dir
 from .api.routes.reference import router as reference_router
+from .api.routes.text_split import router as text_split_router
+from .api.routes.audio_merge import router as audio_merge_router
 
 
 MEMORY_THRESHOLD_MB = 500
@@ -70,6 +72,8 @@ app.add_middleware(
 )
 
 app.include_router(reference_router)
+app.include_router(text_split_router)
+app.include_router(audio_merge_router)
 
 UPLOAD_DIR = get_upload_dir()
 OUTPUT_DIR = get_output_dir()
@@ -92,10 +96,6 @@ async def health_check():
             "total_mb": int(mem.total / (1024 * 1024)),
             "available_mb": int(mem.available / (1024 * 1024)),
             "used_percent": mem.percent,
-        },
-        "concurrency": {
-            "max_tts": MAX_CONCURRENT_TTS,
-            "max_long_tts": MAX_CONCURRENT_LONG_TTS,
         },
     }
 

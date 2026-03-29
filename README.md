@@ -150,6 +150,60 @@ POST /tts/generate
 
 注意: `reference_id` 和 `reference_name` 二选一，参数可覆盖默认值
 
+### 长文本拆分
+
+```bash
+POST /text/split
+```
+
+参数 (JSON Body):
+
+- `text` (必填): 要拆分的长文本
+- `max_length` (可选): 单个片段的最大字符数，默认 200，范围 10-2000
+- `min_chunk_length` (可选): 合并短片段的最小长度阈值，默认 50，范围 1-500
+- `merge_short` (可选): 是否合并过短的片段，默认 True
+
+拆分策略:
+1. 首先按段落拆分
+2. 对于超出大小的段落，按句子拆分
+3. 对于仍然超出大小的句子，尝试按子句拆分
+4. 合并过短的片段
+
+响应示例:
+```json
+{
+  "success": true,
+  "chunks": ["片段1", "片段2", "片段3"],
+  "chunk_count": 3,
+  "original_length": 500,
+  "max_length": 200
+}
+```
+
+### 音频合并
+
+```bash
+POST /audio/merge
+```
+
+使用 ffmpeg concat 合并多个音频文件为单个音频文件。
+
+参数 (multipart/form-data):
+
+- `files` (必填): 音频文件列表，至少需要2个文件
+- 支持格式: wav, mp3, m4a, flac, ogg, aac
+
+响应: 返回合并后的 WAV 音频文件
+
+示例:
+```bash
+curl -X POST "http://localhost:8001/audio/merge" \
+  -F "files=@1.wav" \
+  -F "files=@2.wav" \
+  -F "files=@3.wav" \
+  --output merged.wav
+```
+
 ## 风格提示词示例
 
 ### 语速节奏
@@ -226,6 +280,11 @@ curl -X POST "http://localhost:8001/tts/generate" \
   -F "reference_name=我的音色" \
   -F "exaggeration=0.7" \
   --output output2.wav
+
+# 5. 长文本拆分
+curl -X POST "http://localhost:8001/text/split" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "这是一个很长的文本，需要拆分成多个片段...", "max_length": 200}'
 ```
 
 ### Python 示例
@@ -244,6 +303,20 @@ response = requests.post(
 
 with open("output.wav", "wb") as f:
     f.write(response.content)
+
+# 长文本拆分
+response = requests.post(
+    "http://localhost:8001/text/split",
+    json={
+        "text": "这是一个很长的文本，需要拆分成多个片段...",
+        "max_length": 200,
+    },
+)
+
+result = response.json()
+print(f"拆分结果: {result['chunk_count']} 个片段")
+for i, chunk in enumerate(result["chunks"]):
+    print(f"片段 {i+1}: {chunk}")
 ```
 
 ## 技术细节
