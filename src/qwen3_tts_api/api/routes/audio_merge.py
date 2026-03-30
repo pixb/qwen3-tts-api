@@ -5,7 +5,8 @@ import subprocess
 import uuid
 import shutil
 from pathlib import Path
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 
@@ -49,7 +50,7 @@ async def merge_audio_files(files: List[UploadFile] = File(...)):
                 shutil.copyfileobj(file.file, f)
             input_paths.append(temp_path)
 
-        output_filename = f"merged_{uuid.uuid4()}.wav"
+        output_filename = f"merged_{datetime.now().strftime('%Y%m%d-%H%M%S')}.wav"
         output_path = output_dir / output_filename
 
         cmd = ["ffmpeg", "-y"]
@@ -90,3 +91,42 @@ async def merge_audio_files(files: List[UploadFile] = File(...)):
         )
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+@router.post("/upload")
+async def upload_audio(file: UploadFile = File(...)):
+    """
+    上传音频文件到服务器
+    
+    - **file**: 要上传的音频文件 (支持 wav/mp3/m4a/flac/ogg/aac)
+    
+    返回可访问的音频 URL
+    """
+    ext = Path(file.filename).suffix.lower() if file.filename else ".wav"
+    if ext not in [".wav", ".mp3", ".m4a", ".flac", ".ogg", ".aac"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported audio format: {ext}"
+        )
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    filename = f"{timestamp}{ext}"
+    output_path = get_output_dir() / filename
+
+    try:
+        with open(output_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        
+        file_size = output_path.stat().st_size
+        
+        return {
+            "success": True,
+            "filename": filename,
+            "url": f"/audio/{filename}",
+            "size": file_size
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error uploading audio: {str(e)}"
+        )

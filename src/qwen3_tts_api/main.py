@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .config import (
     DEFAULT_LANGUAGE,
@@ -77,6 +78,8 @@ app.include_router(audio_merge_router)
 
 UPLOAD_DIR = get_upload_dir()
 OUTPUT_DIR = get_output_dir()
+
+app.mount("/audio", StaticFiles(directory=str(OUTPUT_DIR)), name="audio")
 
 
 @app.get("/health")
