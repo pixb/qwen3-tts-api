@@ -22,7 +22,7 @@ TTS_BASE_URL = os.environ.get("TTS_BASE_URL", "http://localhost:8001")
 
 class TextSplitInput(BaseModel):
     text: str = Field(..., description="Text to split into chunks", min_length=1)
-    max_length: int = Field(default=200, description="Maximum characters per chunk", ge=10, le=2000)
+    max_length: int = Field(default=100, description="Maximum characters per chunk", ge=10, le=2000)
     min_chunk_length: int = Field(default=50, description="Minimum chunk length for merging short chunks", ge=1, le=500)
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -100,7 +100,7 @@ async def text_split(params: TextSplitInput) -> str:
     Args:
         params (TextSplitInput): Input parameters containing:
             - text (str): The text to split
-            - max_length (int): Maximum characters per chunk (default: 200)
+            - max_length (int): Maximum characters per chunk (default: 100)
             - min_chunk_length (int): Minimum chunk length for merging (default: 50)
 
     Returns:
@@ -110,7 +110,7 @@ async def text_split(params: TextSplitInput) -> str:
                 "chunks": ["chunk1", "chunk2", ...],
                 "chunk_count": 5,
                 "original_length": 1000,
-                "max_length": 200
+                "max_length": 100
             }
     """
     try:
@@ -167,6 +167,10 @@ async def reference_list(params: ReferenceListInput) -> str:
     """
     try:
         result = await _make_request("GET", "/tts/reference/list")
+        if result.get("success") and result.get("data"):
+            data = result["data"]
+            result["default"] = next((r for r in data if r.get("is_default")), data[0] if data else None)
+            result["choices"] = [{"id": r["id"], "name": r["name"]} for r in data]
         return json.dumps(result, indent=2, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
@@ -209,10 +213,7 @@ async def tts_generate(params: TTSGenerateInput) -> str:
     if not params.reference_name and not params.reference_id:
         return json.dumps({"success": False, "error": "Either reference_name or reference_id is required"})
 
-    if not params.ref_text:
-        return json.dumps({"success": False, "error": "ref_text is required"})
-
-    data = {"text": params.text, "language": params.language, "ref_text": params.ref_text}
+    data = {"text": params.text, "language": params.language}
     if params.reference_name:
         data["reference_name"] = params.reference_name
     if params.reference_id:
@@ -226,13 +227,45 @@ async def tts_generate(params: TTSGenerateInput) -> str:
     if params.speed_rate is not None:
         data["speed_rate"] = params.speed_rate
 
+    if params.ref_text:
+        data["ref_text"] = params.ref_text
+    else:
+        try:
+            ref_result = await _make_request("GET", "/tts/reference/list")
+            if ref_result.get("success") and ref_result.get("data"):
+                refs = ref_result["data"]
+                target_ref = None
+                if params.reference_id:
+                    target_ref = next((r for r in refs if r.get("id") == params.reference_id), None)
+                elif params.reference_name:
+                    target_ref = next((r for r in refs if r.get("name") == params.reference_name), None)
+                if target_ref:
+                    data["ref_text"] = target_ref.get("ref_text", "")
+                    if params.exaggeration is None and target_ref.get("exaggeration") is not None:
+                        data["exaggeration"] = target_ref.get("exaggeration")
+                    if params.temperature is None and target_ref.get("temperature") is not None:
+                        data["temperature"] = target_ref.get("temperature")
+                    if not params.instruct and target_ref.get("instruct"):
+                        data["instruct"] = target_ref.get("instruct")
+                    if params.speed_rate is None and target_ref.get("speed_rate") is not None:
+                        data["speed_rate"] = target_ref.get("speed_rate")
+                else:
+                    return json.dumps({"success": False, "error": f"Reference not found: {params.reference_name or params.reference_id}"})
+            else:
+                return json.dumps({"success": False, "error": "Failed to fetch reference list"})
+        except Exception as e:
+            return json.dumps({"success": False, "error": f"Failed to get reference: {str(e)}"})
+
     try:
         response = await _make_request("POST", "/tts/generate", data=data)
         
         if "_binary" in response:
             import time
             filename = f"tts_{int(time.time())}.wav"
-            return json.dumps(_save_binary(response["_binary"], filename, params.output_dir), indent=2)
+            output_dir = params.output_dir if params.output_dir else "output"
+            result = _save_binary(response["_binary"], filename, output_dir)
+            result["download_url"] = f"{TTS_BASE_URL}/audio/{filename}"
+            return json.dumps(result, indent=2)
         
         return json.dumps(response, indent=2, ensure_ascii=False)
     except Exception as e:
@@ -268,6 +301,8 @@ async def audio_merge(params: AudioMergeInput) -> str:
     if len(params.files) < 2:
         return json.dumps({"success": False, "error": "At least 2 audio files are required"})
 
+    output_dir = params.output_dir if params.output_dir else "output"
+
     try:
         files = []
         for file_path in params.files:
@@ -285,9 +320,8 @@ async def audio_merge(params: AudioMergeInput) -> str:
                     filename = content_disposition.split("filename=")[-1].strip('"')
                 else:
                     filename = "merged.wav"
-                result = _save_binary(response.content, filename, params.output_dir)
-                if params.output_dir:
-                    result["download_url"] = f"{TTS_BASE_URL}/audio/{filename}"
+                result = _save_binary(response.content, filename, output_dir)
+                result["download_url"] = f"{TTS_BASE_URL}/audio/{filename}"
                 return json.dumps(result, indent=2)
             
             return json.dumps(response.json(), indent=2, ensure_ascii=False)

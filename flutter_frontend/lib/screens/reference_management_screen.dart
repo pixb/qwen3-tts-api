@@ -553,6 +553,7 @@ class _ReferenceManagementScreenState
     required double max,
     required ValueChanged<double> onChanged,
   }) {
+    final divisions = ((max - min) * 10).round();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -573,7 +574,7 @@ class _ReferenceManagementScreenState
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                value.toStringAsFixed(2),
+                value.toStringAsFixed(1),
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -587,6 +588,7 @@ class _ReferenceManagementScreenState
           value: value,
           min: min,
           max: max,
+          divisions: divisions,
           onChanged: onChanged,
         ),
       ],

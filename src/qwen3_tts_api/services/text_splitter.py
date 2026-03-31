@@ -29,7 +29,7 @@ class TextSplitter:
     
     def __init__(
         self,
-        max_length: int = 200,
+        max_length: int = 100,
         min_chunk_length: int = 50,
         merge_short: bool = True,
     ):
@@ -234,7 +234,7 @@ class TextSplitter:
         return merged
 
 
-def split_text(text: str, max_length: int = 200, **kwargs) -> SplitResult:
+def split_text(text: str, max_length: int = 100, **kwargs) -> SplitResult:
     """拆分文本的便捷函数"""
     splitter = TextSplitter(max_length=max_length, **kwargs)
     return splitter.split(text)

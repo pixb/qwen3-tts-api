@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 class TextSplitRequest(BaseModel):
     """文本拆分请求"""
     text: str = Field(..., min_length=1, description="要拆分的长文本")
-    max_length: int = Field(200, ge=10, le=2000, description="单个片段的最大字符数")
+    max_length: int = Field(100, ge=10, le=2000, description="单个片段的最大字符数")
     min_chunk_length: int = Field(50, ge=1, le=500, description="合并短片段的最小长度阈值")
     merge_short: bool = Field(True, description="是否合并过短的片段")
 

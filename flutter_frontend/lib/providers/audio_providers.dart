@@ -45,7 +45,7 @@ class AudioGenerationState {
     this.cloneLanguage,
     this.isSplitting = false,
     this.splitChunks = const [],
-    this.splitMaxLength = 200,
+    this.splitMaxLength = 100,
   });
 
   AudioGenerationState copyWith({

@@ -51,7 +51,9 @@ class _AudioGenerationScreenState extends ConsumerState<AudioGenerationScreen>
         _showError(next.error!);
         ref.read(audioGenerationProvider.notifier).clearError();
       }
-      if (next.hasAudio && next.audioUrl != null && (previous?.hasAudio != true)) {
+      if (next.hasAudio &&
+          next.audioUrl != null &&
+          (previous?.hasAudio != true)) {
         _showSuccess('Audio generated successfully!');
       }
     });
@@ -363,7 +365,7 @@ class _AudioGenerationScreenState extends ConsumerState<AudioGenerationScreen>
                       value: audioState.splitMaxLength.toDouble(),
                       min: 50,
                       max: 500,
-                      divisions: 9,
+                      divisions: 450,
                       onChanged: (value) {
                         ref
                             .read(audioGenerationProvider.notifier)
@@ -832,6 +834,7 @@ class _AudioGenerationScreenState extends ConsumerState<AudioGenerationScreen>
   Widget _buildSlider(
       String label, double value, ValueChanged<double> onChanged,
       {double min = 0.0, double max = 1.0}) {
+    final divisions = ((max - min) * 10).round();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -840,7 +843,7 @@ class _AudioGenerationScreenState extends ConsumerState<AudioGenerationScreen>
           children: [
             Text(label,
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-            Text(value.toStringAsFixed(2),
+            Text(value.toStringAsFixed(1),
                 style:
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
           ],
@@ -851,6 +854,7 @@ class _AudioGenerationScreenState extends ConsumerState<AudioGenerationScreen>
             value: value,
             min: min,
             max: max,
+            divisions: divisions,
             onChanged: onChanged,
           ),
         ),
